@@ -67,12 +67,12 @@ struct ContentView: View {
             chinWidth = 640
         } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
             && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle)
-            && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed
+            && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed && !vm.shouldHideNotch
         {
             chinWidth += (2 * max(0, vm.effectiveClosedNotchHeight - 12) + 20)
         } else if !coordinator.expandingView.show && vm.notchState == .closed
             && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace]
-            && !vm.hideOnClosed
+            && !vm.hideOnClosed && !vm.shouldHideNotch
         {
             chinWidth += (2 * max(0, vm.effectiveClosedNotchHeight - 12) + 20)
         }
@@ -146,6 +146,15 @@ struct ContentView: View {
                                 handleUpGesture(translation: translation, phase: phase)
                             }
                     }
+                    .conditionalModifier(Defaults[.enableGestures]) { view in
+                        view
+                            .panGesture(direction: .left) { translation, phase in
+                                handleDismissGesture(translation: translation, phase: phase)
+                            }
+                            .panGesture(direction: .right) { translation, phase in
+                                handleDismissGesture(translation: translation, phase: phase)
+                            }
+                    }
                     .onReceive(NotificationCenter.default.publisher(for: .sharingDidFinish)) { _ in
                         if vm.notchState == .open && !isHovering && !vm.isBatteryPopoverActive {
                             hoverTask?.cancel()
@@ -183,6 +192,14 @@ struct ContentView: View {
                     }
                     .sensoryFeedback(.alignment, trigger: haptics)
                     .contextMenu {
+                        Button("Hide notch") {
+                            withAnimation(animationSpring) {
+                                vm.close()
+                            }
+                            coordinator.hideNotchManually()
+                        }
+                        Text("Bring it back from the menu bar icon")
+                        Divider()
                         Button("Settings") {
                             DispatchQueue.main.async {
                                 SettingsWindowController.shared.showWindow()
@@ -287,10 +304,10 @@ struct ContentView: View {
                       } else if coordinator.sneakPeek.show && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && vm.notchState == .closed {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(.opacity)
-                      } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music) && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle) && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed {
+                      } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music) && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle) && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed && !vm.shouldHideNotch {
                           MusicLiveActivity()
                               .frame(alignment: .center)
-                      } else if !coordinator.expandingView.show && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
+                      } else if !coordinator.expandingView.show && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed && !vm.shouldHideNotch  {
                           BoringFaceAnimation()
                        } else if vm.notchState == .open {
                            BoringHeader()
@@ -503,8 +520,26 @@ struct ContentView: View {
     }
 
     private func doOpen() {
+        // A manually dismissed notch stays dismissed until it is brought back
+        // from the menu bar; ignore hover/tap opens while hidden.
+        if coordinator.isNotchManuallyHidden { return }
         withAnimation(animationSpring) {
             vm.open()
+        }
+    }
+
+    // MARK: - Slide to dismiss (iPhone-style)
+
+    private func handleDismissGesture(translation: CGFloat, phase: NSEvent.Phase) {
+        guard vm.notchState == .closed else { return }
+        // Only allow dismissing something that is actually visible.
+        guard vm.effectiveClosedNotchHeight > 0, !coordinator.isNotchManuallyHidden else { return }
+
+        if translation > Defaults[.gestureSensitivity] {
+            if Defaults[.enableHaptics] {
+                haptics.toggle()
+            }
+            coordinator.hideNotchManually()
         }
     }
 
