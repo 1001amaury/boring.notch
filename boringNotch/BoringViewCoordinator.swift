@@ -101,6 +101,11 @@ class BoringViewCoordinator: ObservableObject {
     private var accessibilityObserver: Any?
     private var hudReplacementCancellable: AnyCancellable?
 
+    /// Whether the user has manually dismissed the notch (swipe-to-dismiss / right-click hide).
+    /// Mirrors `Defaults[.notchManuallyHidden]` so both the notch UI and the menu bar item stay in sync.
+    @Published var isNotchManuallyHidden: Bool = Defaults[.notchManuallyHidden]
+    private var manualHideCancellable: AnyCancellable?
+
     private init() {
         // Perform migration from name-based to UUID-based storage
         if preferredScreenUUID == nil, let legacyName = legacyPreferredScreenName {
@@ -158,6 +163,18 @@ class BoringViewCoordinator: ObservableObject {
                     } else {
                         MediaKeyInterceptor.shared.stop()
                     }
+                }
+            }
+
+        // Keep the manual-hide flag in sync with Defaults so a change from the menu bar item
+        // (which binds directly to the default) is reflected in the notch UI, and vice versa.
+        manualHideCancellable = Defaults.publisher(.notchManuallyHidden)
+            .map(\.newValue)
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] hidden in
+                withAnimation(.smooth) {
+                    self?.isNotchManuallyHidden = hidden
                 }
             }
 
@@ -296,5 +313,21 @@ class BoringViewCoordinator: ObservableObject {
     
     func showEmpty() {
         currentView = .home
+    }
+
+    // MARK: - Manual hide (swipe-to-dismiss / menu bar toggle)
+
+    /// Dismiss the notch entirely until the user brings it back (e.g. from the menu bar item).
+    func hideNotchManually() {
+        Defaults[.notchManuallyHidden] = true
+    }
+
+    /// Bring a manually dismissed notch back.
+    func showNotchManually() {
+        Defaults[.notchManuallyHidden] = false
+    }
+
+    func toggleNotchManually() {
+        Defaults[.notchManuallyHidden].toggle()
     }
 }

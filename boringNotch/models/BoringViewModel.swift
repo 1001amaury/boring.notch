@@ -28,6 +28,9 @@ class BoringViewModel: NSObject, ObservableObject {
     
     @Published var hideOnClosed: Bool = true
 
+    /// True when "hide notch when no media" is enabled and nothing is currently playing/paused.
+    @Published var hideForNoMedia: Bool = false
+
     @Published var edgeAutoOpenActive: Bool = false
     @Published var isHoveringCalendar: Bool = false
     @Published var isBatteryPopoverActive: Bool = false
@@ -67,8 +70,41 @@ class BoringViewModel: NSObject, ObservableObject {
             .store(in: &cancellables)
         
         setupDetectorObserver()
+        setupNoMediaObserver()
     }
-    
+
+    private func setupNoMediaObserver() {
+        // Whether the "hide when no media" preference is enabled.
+        let enabledPublisher = Defaults
+            .publisher(.hideNotchWhenNoMedia)
+            .map(\.newValue)
+            .removeDuplicates()
+
+        // Whether any media is currently active (playing, or paused but loaded).
+        let musicManager = MusicManager.shared
+        let mediaActivePublisher = Publishers.CombineLatest(
+            musicManager.$isPlaying.removeDuplicates(),
+            musicManager.$isPlayerIdle.removeDuplicates()
+        )
+        .map { isPlaying, isPlayerIdle in
+            isPlaying || !isPlayerIdle
+        }
+        .removeDuplicates()
+
+        Publishers.CombineLatest(enabledPublisher, mediaActivePublisher)
+            .map { enabled, mediaActive in
+                enabled && !mediaActive
+            }
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] shouldHide in
+                withAnimation(.smooth) {
+                    self?.hideForNoMedia = shouldHide
+                }
+            }
+            .store(in: &cancellables)
+    }
+
     private func setupDetectorObserver() {
         // Publisher for the user’s fullscreen detection setting
         let enabledPublisher = Defaults
@@ -106,7 +142,24 @@ class BoringViewModel: NSObject, ObservableObject {
     var effectiveClosedNotchHeight: CGFloat {
         let currentScreen = screenUUID.flatMap { NSScreen.screen(withUUID: $0) }
         let noNotchAndFullscreen = hideOnClosed && (currentScreen?.safeAreaInsets.top ?? 0 <= 0 || currentScreen == nil)
-        return noNotchAndFullscreen ? 0 : closedNotchSize.height
+        if noNotchAndFullscreen { return 0 }
+        if shouldHideNotch { return 0 }
+        return closedNotchSize.height
+    }
+
+    /// Whether the closed notch should fully collapse (become invisible).
+    /// Happens when the user dismissed it manually, or when "hide when no media"
+    /// is on and nothing is playing. Transient system UI (HUD, sneak peek, battery,
+    /// the hello animation) always keeps the notch on screen.
+    var shouldHideNotch: Bool {
+        guard notchState == .closed else { return false }
+
+        let coordinator = BoringViewCoordinator.shared
+        if coordinator.helloAnimationRunning { return false }
+        if coordinator.sneakPeek.show { return false }
+        if coordinator.expandingView.show { return false }
+
+        return coordinator.isNotchManuallyHidden || hideForNoMedia
     }
 
     var chinHeight: CGFloat {

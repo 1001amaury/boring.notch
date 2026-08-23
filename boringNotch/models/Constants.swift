@@ -179,6 +179,15 @@ extension Defaults.Keys {
     
     // MARK: Fullscreen Media Detection
     static let hideNotchOption = Key<HideNotchOption>("hideNotchOption", default: .nowPlayingOnly)
+
+    // MARK: No-media behavior
+    // When enabled, the closed notch fully disappears whenever no media is active
+    // (nothing playing and no paused track). Handy on Macs without a physical notch.
+    static let hideNotchWhenNoMedia = Key<Bool>("hideNotchWhenNoMedia", default: false)
+
+    // User-driven manual dismiss (iPhone-style swipe-to-dismiss / right-click hide).
+    // Persisted so it survives relaunch and is toggled back from the menu bar item.
+    static let notchManuallyHidden = Key<Bool>("notchManuallyHidden", default: false)
     
     // MARK: Media Controller
     static let mediaController = Key<MediaControllerType>("mediaController", default: defaultMediaController)
