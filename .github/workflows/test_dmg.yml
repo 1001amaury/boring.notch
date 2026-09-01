@@ -1,0 +1,99 @@
+name: "Test DMG (unsigned)"
+
+# Builds an ad-hoc–signed .app and packages it into a downloadable DMG.
+# No Apple signing secrets required — meant for quickly testing your own
+# changes without compiling locally. The resulting app is NOT notarized, so
+# after mounting the DMG run:  xattr -dr com.apple.quarantine /Applications/boringNotch.app
+on:
+  # For manual runs, pick the branch to build from the "Run workflow" dropdown.
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: test-dmg-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build unsigned DMG
+    # macos-15 ships Xcode 16, the toolchain this project targets.
+    runs-on: macos-15
+    env:
+      PROJECT_NAME: boringNotch
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          # Prefer Xcode 16, fall back to the newest Xcode available on the runner.
+          XCODE_APP="$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)"
+          if [[ -z "$XCODE_APP" ]]; then
+            XCODE_APP="$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)"
+          fi
+          if [[ -z "$XCODE_APP" ]]; then
+            echo "::error::No Xcode found on the runner"
+            ls -d /Applications/Xcode*.app || true
+            exit 1
+          fi
+          echo "Using $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP"
+          xcodebuild -version
+
+      - name: Resolve Swift packages
+        run: xcodebuild -resolvePackageDependencies -project "${PROJECT_NAME}.xcodeproj"
+
+      - name: Build archive (ad-hoc signed)
+        run: |
+          xcodebuild clean archive \
+            -project "${PROJECT_NAME}.xcodeproj" \
+            -scheme "${PROJECT_NAME}" \
+            -configuration Release \
+            -archivePath "$RUNNER_TEMP/${PROJECT_NAME}.xcarchive" \
+            -destination "generic/platform=macOS" \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=YES \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER=""
+
+      - name: Extract .app from archive
+        run: |
+          mkdir -p Release
+          APP_SRC="$RUNNER_TEMP/${PROJECT_NAME}.xcarchive/Products/Applications/${PROJECT_NAME}.app"
+          if [[ ! -d "$APP_SRC" ]]; then
+            echo "::error::Built app not found at $APP_SRC"
+            find "$RUNNER_TEMP/${PROJECT_NAME}.xcarchive" -maxdepth 4 -name "*.app" || true
+            exit 1
+          fi
+          cp -R "$APP_SRC" "Release/${PROJECT_NAME}.app"
+
+      - name: Create DMG
+        run: |
+          VENV_DIR="$RUNNER_TEMP/venv"
+          python3 -m venv "$VENV_DIR"
+          source "$VENV_DIR/bin/activate"
+          python3 -m pip install --upgrade pip setuptools wheel
+          python3 -m pip install --require-hashes -r Configuration/dmg/requirements.txt
+          chmod +x Configuration/dmg/create_dmg.sh
+          ./Configuration/dmg/create_dmg.sh \
+            "Release/${PROJECT_NAME}.app" \
+            "Release/${PROJECT_NAME}.dmg" \
+            "${PROJECT_NAME}"
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PROJECT_NAME }}-dmg
+          path: Release/${{ env.PROJECT_NAME }}.dmg
+          if-no-files-found: error

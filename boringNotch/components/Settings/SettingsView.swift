@@ -152,10 +152,32 @@ struct GeneralSettings: View {
     @Default(.automaticallySwitchDisplay) var automaticallySwitchDisplay
     @Default(.enableGestures) var enableGestures
     @Default(.openNotchOnHover) var openNotchOnHover
-    
+    @Default(.appLanguage) var appLanguage
+    @State private var showLanguageRestartAlert = false
+
 
     var body: some View {
         Form {
+            Section {
+                Picker("Language", selection: $appLanguage) {
+                    Text("System Default").tag("")
+                    Divider()
+                    ForEach(AppLanguage.all) { language in
+                        Text(language.name).tag(language.code)
+                    }
+                }
+                .onChange(of: appLanguage) {
+                    AppLanguage.apply(appLanguage)
+                    showLanguageRestartAlert = true
+                }
+            } header: {
+                Text("Language")
+            } footer: {
+                Text("Changes the language of the whole interface. The app must be restarted to apply.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section {
                 Toggle(isOn: Binding(
                     get: { Defaults[.menubarIcon] },
@@ -280,6 +302,14 @@ struct GeneralSettings: View {
             if !openNotchOnHover {
                 enableGestures = true
             }
+        }
+        .alert("Restart required", isPresented: $showLanguageRestartAlert) {
+            Button("Restart Now") {
+                ApplicationRelauncher.restart()
+            }
+            Button("Later", role: .cancel) {}
+        } message: {
+            Text("The language change will apply after Boring Notch restarts.")
         }
     }
 
@@ -991,7 +1021,7 @@ struct PomodoroSettings: View {
     }
 
     @ViewBuilder
-    private func durationStepper(title: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+    private func durationStepper(title: LocalizedStringKey, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
         Stepper(value: value, in: range, step: 1) {
             HStack {
                 Text(title)

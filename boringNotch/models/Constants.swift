@@ -18,6 +18,45 @@ let appVersion = "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as
 let temporaryDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
 let spacing: CGFloat = 16
 
+/// A language the interface can be switched to. Code matches the folders in
+/// the localization catalog; the name is shown in the language's own script.
+struct AppLanguage: Identifiable, Hashable {
+    let code: String
+    let name: String
+    var id: String { code }
+
+    /// Languages available in the Localizable catalog, listed for the picker.
+    static let all: [AppLanguage] = [
+        AppLanguage(code: "en", name: "English"),
+        AppLanguage(code: "fr", name: "Français"),
+        AppLanguage(code: "de", name: "Deutsch"),
+        AppLanguage(code: "es", name: "Español"),
+        AppLanguage(code: "it", name: "Italiano"),
+        AppLanguage(code: "pt-BR", name: "Português (Brasil)"),
+        AppLanguage(code: "ru", name: "Русский"),
+        AppLanguage(code: "uk", name: "Українська"),
+        AppLanguage(code: "pl", name: "Polski"),
+        AppLanguage(code: "cs", name: "Čeština"),
+        AppLanguage(code: "hu", name: "Magyar"),
+        AppLanguage(code: "tr", name: "Türkçe"),
+        AppLanguage(code: "ar", name: "العربية"),
+        AppLanguage(code: "ko", name: "한국어"),
+        AppLanguage(code: "zh-Hans", name: "简体中文"),
+    ]
+
+    /// Applies the chosen language by overriding `AppleLanguages`. Pass an empty
+    /// string to clear the override and follow the system language again.
+    /// Takes effect after the app is relaunched.
+    static func apply(_ code: String) {
+        if code.isEmpty {
+            UserDefaults.standard.removeObject(forKey: "AppleLanguages")
+        } else {
+            UserDefaults.standard.set([code], forKey: "AppleLanguages")
+        }
+        UserDefaults.standard.synchronize()
+    }
+}
+
 struct CustomVisualizer: Codable, Hashable, Equatable, Defaults.Serializable {
     let UUID: UUID
     var name: String
@@ -71,6 +110,8 @@ enum OptionKeyAction: String, CaseIterable, Identifiable, Defaults.Serializable 
 extension Defaults.Keys {
     // MARK: General
     static let menubarIcon = Key<Bool>("menubarIcon", default: true)
+    // Empty string means "follow the system language".
+    static let appLanguage = Key<String>("appLanguage", default: "")
     static let showOnAllDisplays = Key<Bool>("showOnAllDisplays", default: false)
     static let automaticallySwitchDisplay = Key<Bool>("automaticallySwitchDisplay", default: true)
     static let releaseName = Key<String>("releaseName", default: "Flying Rabbit 🐇🪽")

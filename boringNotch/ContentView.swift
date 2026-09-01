@@ -207,13 +207,19 @@ struct ContentView: View {
                     }
                     .sensoryFeedback(.alignment, trigger: haptics)
                     .contextMenu {
-                        Button("Hide notch") {
-                            withAnimation(animationSpring) {
-                                vm.close()
+                        Button(coordinator.isNotchManuallyHidden ? "Show notch" : "Hide notch") {
+                            if coordinator.isNotchManuallyHidden {
+                                coordinator.showNotchManually()
+                            } else {
+                                withAnimation(animationSpring) {
+                                    vm.close()
+                                }
+                                coordinator.hideNotchManually()
                             }
-                            coordinator.hideNotchManually()
                         }
-                        Text("Bring it back from the menu bar icon")
+                        if !coordinator.isNotchManuallyHidden {
+                            Text("Bring it back from here or the menu bar icon")
+                        }
                         Divider()
                         Button("Settings") {
                             DispatchQueue.main.async {
