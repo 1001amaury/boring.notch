@@ -28,7 +28,8 @@ jobs:
           - ^16
         scheme:
           - boringNotch
-    runs-on: macos-latest
+    # macos-latest moved to macOS 26 (Xcode 26 only); pin to macos-15 which ships Xcode 16.
+    runs-on: macos-15
     steps:
     - name: Code Checkout
       # TODO: pin to immutable SHA
