@@ -65,14 +65,19 @@ struct PomodoroView: View {
 
     private var phaseHeader: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(pomodoro.phase.title)
+            Text(LocalizedStringKey(pomodoro.phase.title))
                 .font(.system(.title3, design: .rounded))
                 .fontWeight(.bold)
                 .foregroundStyle(.white)
-            Text(pomodoro.isRunning ? "In progress" : (pomodoro.isActive ? "Paused" : "Ready"))
+            Text(statusKey)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var statusKey: LocalizedStringKey {
+        if pomodoro.isRunning { return "In progress" }
+        return pomodoro.isActive ? "Paused" : "Ready"
     }
 
     private var sessionDots: some View {
