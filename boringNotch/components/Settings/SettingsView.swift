@@ -51,6 +51,9 @@ struct SettingsView: View {
                 NavigationLink(value: "Shelf") {
                     Label("Shelf", systemImage: "books.vertical")
                 }
+                NavigationLink(value: "Pomodoro") {
+                    Label("Pomodoro", systemImage: "timer")
+                }
                 NavigationLink(value: "Shortcuts") {
                     Label("Shortcuts", systemImage: "keyboard")
                 }
@@ -85,6 +88,8 @@ struct SettingsView: View {
                     Charge()
                 case "Shelf":
                     Shelf()
+                case "Pomodoro":
+                    PomodoroSettings()
                 case "Shortcuts":
                     Shortcuts()
                 case "Extensions":
@@ -913,8 +918,93 @@ struct About: View {
     }
 }
 
+struct PomodoroSettings: View {
+    @Default(.enablePomodoro) var enablePomodoro
+    @Default(.pomodoroWorkDuration) var workDuration
+    @Default(.pomodoroShortBreakDuration) var shortBreakDuration
+    @Default(.pomodoroLongBreakDuration) var longBreakDuration
+    @Default(.pomodoroSessionsUntilLongBreak) var sessionsUntilLongBreak
+    @Default(.pomodoroAutoStartBreaks) var autoStartBreaks
+    @Default(.pomodoroAutoStartWork) var autoStartWork
+    @Default(.pomodoroPlaySound) var playSound
+    @Default(.pomodoroShowInNotch) var showInNotch
+    @Default(.pomodoroUseAccentColor) var useAccentColor
+
+    var body: some View {
+        Form {
+            Section {
+                Defaults.Toggle(key: .enablePomodoro) {
+                    Text("Enable Pomodoro")
+                }
+            } footer: {
+                Text("Adds a Pomodoro tab to the notch and, when a timer is running, shows it in the closed notch.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                durationStepper(title: "Focus duration", value: $workDuration, range: 1...120)
+                durationStepper(title: "Short break", value: $shortBreakDuration, range: 1...60)
+                durationStepper(title: "Long break", value: $longBreakDuration, range: 1...60)
+                Stepper(value: $sessionsUntilLongBreak, in: 1...12) {
+                    HStack {
+                        Text("Sessions before long break")
+                        Spacer()
+                        Text("\(sessionsUntilLongBreak)")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Durations")
+            }
+            .disabled(!enablePomodoro)
+
+            Section {
+                Defaults.Toggle(key: .pomodoroAutoStartBreaks) {
+                    Text("Auto-start breaks")
+                }
+                Defaults.Toggle(key: .pomodoroAutoStartWork) {
+                    Text("Auto-start next focus session")
+                }
+                Defaults.Toggle(key: .pomodoroPlaySound) {
+                    Text("Play a sound when a phase ends")
+                }
+            } header: {
+                Text("Behavior")
+            }
+            .disabled(!enablePomodoro)
+
+            Section {
+                Defaults.Toggle(key: .pomodoroShowInNotch) {
+                    Text("Show timer in the closed notch")
+                }
+                Defaults.Toggle(key: .pomodoroUseAccentColor) {
+                    Text("Use accent color instead of phase colors")
+                }
+            } header: {
+                Text("Appearance")
+            }
+            .disabled(!enablePomodoro)
+        }
+        .accentColor(.effectiveAccent)
+        .navigationTitle("Pomodoro")
+    }
+
+    @ViewBuilder
+    private func durationStepper(title: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+        Stepper(value: value, in: range, step: 1) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text("\(Int(value.wrappedValue)) min")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
 struct Shelf: View {
-    
+
     @Default(.shelfTapToOpen) var shelfTapToOpen: Bool
     @Default(.quickShareProvider) var quickShareProvider
     @Default(.expandedDragDetection) var expandedDragDetection: Bool

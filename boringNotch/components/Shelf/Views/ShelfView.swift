@@ -70,11 +70,46 @@ struct ShelfView: View {
                 content
                     .padding()
             }
+            .overlay(alignment: .topTrailing) {
+                pasteButton
+                    .padding(8)
+            }
+            .background(pasteShortcut)
             .transaction { transaction in
                 transaction.animation = vm.animation
             }
             .contentShape(Rectangle())
             .onTapGesture { selection.clear() }
+    }
+
+    private var pasteButton: some View {
+        Button(action: paste) {
+            HStack(spacing: 4) {
+                Image(systemName: "doc.on.clipboard")
+                Text("Paste")
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.white.opacity(0.85))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(Color.white.opacity(0.1), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .help("Paste text, an image or a link from the clipboard")
+    }
+
+    /// Invisible button that binds ⌘V so the clipboard can be pasted while the notch is open.
+    private var pasteShortcut: some View {
+        Button(action: paste) { Color.clear }
+            .buttonStyle(.plain)
+            .frame(width: 0, height: 0)
+            .keyboardShortcut("v", modifiers: .command)
+            .opacity(0)
+            .accessibilityHidden(true)
+    }
+
+    private func paste() {
+        tvm.pasteFromClipboard()
     }
 
     var content: some View {
