@@ -5,12 +5,8 @@ name: "Test DMG (unsigned)"
 # changes without compiling locally. The resulting app is NOT notarized, so
 # after mounting the DMG run:  xattr -dr com.apple.quarantine /Applications/boringNotch.app
 on:
+  # For manual runs, pick the branch to build from the "Run workflow" dropdown.
   workflow_dispatch:
-    inputs:
-      head_ref:
-        description: "Branch to build"
-        required: false
-        default: main
   push:
     branches:
       - main
@@ -34,8 +30,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.head_ref || github.ref_name }}
 
       - name: Select latest Xcode 16
         run: |
