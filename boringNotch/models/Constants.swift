@@ -171,6 +171,19 @@ extension Defaults.Keys {
     static let autoRemoveShelfItems = Key<Bool>("autoRemoveShelfItems", default: false)
     static let expandedDragDetection = Key<Bool>("expandedDragDetection", default: true)
     
+    // MARK: Pomodoro
+    static let enablePomodoro = Key<Bool>("enablePomodoro", default: true)
+    // Durations are stored in minutes.
+    static let pomodoroWorkDuration = Key<Double>("pomodoroWorkDuration", default: 25)
+    static let pomodoroShortBreakDuration = Key<Double>("pomodoroShortBreakDuration", default: 5)
+    static let pomodoroLongBreakDuration = Key<Double>("pomodoroLongBreakDuration", default: 15)
+    static let pomodoroSessionsUntilLongBreak = Key<Int>("pomodoroSessionsUntilLongBreak", default: 4)
+    static let pomodoroAutoStartBreaks = Key<Bool>("pomodoroAutoStartBreaks", default: true)
+    static let pomodoroAutoStartWork = Key<Bool>("pomodoroAutoStartWork", default: false)
+    static let pomodoroPlaySound = Key<Bool>("pomodoroPlaySound", default: true)
+    static let pomodoroShowInNotch = Key<Bool>("pomodoroShowInNotch", default: true)
+    static let pomodoroUseAccentColor = Key<Bool>("pomodoroUseAccentColor", default: false)
+
     // MARK: Calendar
     static let calendarSelectionState = Key<CalendarSelectionState>("calendarSelectionState", default: .all)
     static let hideAllDayEvents = Key<Bool>("hideAllDayEvents", default: false)

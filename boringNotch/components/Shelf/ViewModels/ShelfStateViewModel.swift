@@ -77,6 +77,82 @@ final class ShelfStateViewModel: ObservableObject {
     }
 
 
+    /// Pastes the current contents of the general pasteboard onto the shelf.
+    /// Handles file URLs, images, web links and plain text.
+    @discardableResult
+    func pasteFromClipboard() -> Bool {
+        let pasteboard = NSPasteboard.general
+
+        // 1. File URLs (copied from Finder).
+        if let urls = pasteboard.readObjects(
+            forClasses: [NSURL.self],
+            options: [.urlReadingFileURLsOnly: true]
+        ) as? [URL], !urls.isEmpty {
+            let fileItems = urls.compactMap { url -> ShelfItem? in
+                guard let bookmark = try? Bookmark(url: url).data else { return nil }
+                return ShelfItem(kind: .file(bookmark: bookmark), isTemporary: false)
+            }
+            if !fileItems.isEmpty {
+                add(fileItems)
+                return true
+            }
+        }
+
+        // 2. Images (e.g. screenshots) — persisted to a temporary file so they can be shared/dragged out.
+        if let images = pasteboard.readObjects(forClasses: [NSImage.self], options: nil) as? [NSImage],
+           let imageData = images.compactMap({ Self.pngData(from: $0) }).first {
+            isLoading = true
+            Task { [weak self] in
+                let name = "Pasted Image \(Self.timestamp).png"
+                let url = await TemporaryFileStorageService.shared.createTempFile(
+                    for: .data(imageData, suggestedName: name)
+                )
+                await MainActor.run {
+                    if let url, let bookmark = try? Bookmark(url: url).data {
+                        self?.add([ShelfItem(kind: .file(bookmark: bookmark), isTemporary: true)])
+                    }
+                    self?.isLoading = false
+                }
+            }
+            return true
+        }
+
+        // 3. Web links.
+        if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
+            let links = urls.filter { !$0.isFileURL }.map { ShelfItem(kind: .link(url: $0)) }
+            if !links.isEmpty {
+                add(links)
+                return true
+            }
+        }
+
+        // 4. Plain text.
+        if let strings = pasteboard.readObjects(forClasses: [NSString.self], options: nil) as? [NSString] {
+            let texts = strings
+                .map { $0 as String }
+                .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                .map { ShelfItem(kind: .text(string: $0)) }
+            if !texts.isEmpty {
+                add(texts)
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private static func pngData(from image: NSImage) -> Data? {
+        guard let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff) else { return nil }
+        return rep.representation(using: .png, properties: [:])
+    }
+
+    private static var timestamp: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+        return formatter.string(from: Date())
+    }
+
     func load(_ providers: [NSItemProvider]) {
         guard !providers.isEmpty else { return }
         isLoading = true
